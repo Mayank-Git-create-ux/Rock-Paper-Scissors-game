@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock, Paper, Scissors</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inter font for a modern look */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0; /* Light text */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Custom button styles for a more playful look */
+        .game-button {
+            /* Added w-full for full width on mobile, md:flex-1 makes it flexible on larger screens */
+            @apply w-full py-4 px-6 mx-2 rounded-xl text-2xl font-bold transition-all duration-300 ease-in-out
+                   hover:scale-105 transform shadow-lg focus:outline-none focus:ring-4 focus:ring-opacity-75
+                   flex flex-col items-center justify-center;
+        }
+
+        .game-button .symbol {
+            font-size: 4rem; /* Significantly larger emoji size */
+            line-height: 1; /* Adjust line height for better vertical centering */
+            margin-bottom: 0.5rem; /* Space between symbol and text */
+        }
+
+        .rock-btn {
+            background-color: #e53e3e; /* Red-ish */
+            color: white;
+            box-shadow: 0 5px 0 #c53030;
+            cursor: pointer;
+        }
+        .rock-btn:active {
+            box-shadow: none;
+            transform: translateY(5px);
+        }
+        .rock-btn:focus {
+            box-ring-color: #fc8181;
+        }
+
+        .paper-btn {
+            background-color: #3182ce; /* Blue-ish */
+            color: white;
+            box-shadow: 0 5px 0 #2b6cb0;
+            cursor: pointer;
+        }
+        .paper-btn:active {
+            box-shadow: none;
+            transform: translateY(5px);
+        }
+        .paper-btn:focus {
+            box-ring-color: #63b3ed;
+        }
+
+        .scissors-btn {
+            background-color: #38a169; /* Green-ish */
+            color: white;
+            box-shadow: 0 5px 0 #2f855a;
+            cursor: pointer;
+        }
+        .scissors-btn:active {
+            box-shadow: none;
+            transform: translateY(5px);
+        }
+        .scissors-btn:focus {
+            box-ring-color: #68d391;
+        }
+
+        /* Styling for the game display area */
+        #game-display-area {
+            @apply flex flex-col items-center justify-center min-h-[250px] mt-8 p-6 rounded-xl shadow-inner text-center;
+            position: relative; /* For absolute positioning of symbols */
+            overflow: hidden; /* Hide overflowing animation parts */
+            background-color: #2d3748; /* Dark grey for result area */
+            color: white;
+            transition: background-color 0.5s ease-out; /* Smooth background change */
+        }
+        #game-display-area.win {
+            background-color: #2f855a; /* Darker green */
+        }
+        #game-display-area.lose {
+            background-color: #c53030; /* Darker red */
+        }
+        #game-display-area.draw {
+            background-color: #2d3748; /* Dark grey */
+        }
+
+        .symbol-display {
+            font-size: 5rem; /* Large size for animated symbols */
+            position: absolute;
+            top: 50%; /* Vertically center */
+            /* Initial horizontal positions will be set by JS, transform handles centering itself */
+            transform: translate(-50%, -50%);
+            transition: left 0.7s ease-out; /* Transition for clash movement */
+        }
+
+        /* Animation Keyframes */
+        /* Rock breaks scissors (scissors reacts) */
+        @keyframes scissorsBreak {
+            0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 1; }
+            30% { transform: translate(-50%, -50%) translateX(10px) rotate(5deg) scale(0.9); opacity: 0.8; }
+            60% { transform: translate(-50%, -50%) translateX(-10px) rotate(-5deg) scale(0.7); opacity: 0.5; }
+            100% { transform: translate(-50%, -50%) scale(0.2) rotate(15deg); opacity: 0; }
+        }
+
+        /* Paper covers rock (rock reacts) */
+        @keyframes rockCovered {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) translateY(-10px) scale(0.8); opacity: 0.7; }
+            100% { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
+        }
+
+        /* Scissors cut paper (paper reacts) */
+        @keyframes paperCut {
+            0% { transform: translate(-50%, -50%) scaleX(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scaleX(0.5); opacity: 0.7; } /* Shrink horizontally */
+            100% { transform: translate(-50%, -50%) scaleX(0.1); opacity: 0; }
+        }
+
+        /* Winner pulse (for the active winner) */
+        @keyframes winnerPulse {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* Draw shake */
+        @keyframes shake {
+            0% { transform: translate(-50%, -50%) translateX(0); }
+            25% { transform: translate(-50%, -50%) translateX(-10px); }
+            50% { transform: translate(-50%, -50%) translateX(10px); }
+            75% { transform: translate(-50%, -50%) translateX(-10px); }
+            100% { transform: translate(-50%, -50%) translateX(0); }
+        }
+
+        /* Apply animation classes based on the losing symbol type */
+        .loser-anim-scissors { animation: scissorsBreak 1.5s forwards; }
+        .loser-anim-rock { animation: rockCovered 1.5s forwards; }
+        .loser-anim-paper { animation: paperCut 1.5s forwards; }
+
+        .winner-pulse-anim { animation: winnerPulse 1.5s ease-in-out forwards; }
+
+        .draw-shake-anim { animation: shake 1.5s infinite alternate; } /* Longer shake for draw */
+
+
+        .winner-symbol-final {
+            font-size: 8rem; /* Larger final size */
+            position: relative; /* No absolute positioning for the final display */
+            transform: none; /* Reset transform */
+            opacity: 1;
+            transition: font-size 0.5s ease-out;
+            margin: 0 auto; /* Center the symbol */
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .game-container {
+                padding: 10px;
+            }
+            .choice-buttons {
+                flex-direction: column;
+                gap: 1rem; /* Space between vertical buttons */
+            }
+            .game-button {
+                width: 100%; /* Full width buttons on small screens */
+                margin: 0;
+            }
+            .game-button .symbol {
+                font-size: 3rem; /* Slightly smaller emoji on small screens */
+            }
+            #game-display-area {
+                min-height: 200px; /* Adjust min-height for smaller screens */
+            }
+            .symbol-display {
+                font-size: 3rem;
+            }
+            .winner-symbol-final {
+                font-size: 6rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="game-container bg-gray-800 p-8 md:p-12 rounded-2xl shadow-2xl max-w-xl w-full text-center">
+        <h1 class="text-5xl md:text-6xl font-extrabold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 animate-pulse">
+            Rock, Paper, Scissors!
+        </h1>
+
+        <p class="text-xl md:text-2xl mb-6 text-gray-300">Make your move:</p>
+
+        <div class="choice-buttons flex flex-col md:flex-row justify-center gap-4 mb-8">
+            <button id="rock" class="game-button rock-btn">
+                <span class="symbol">🪨</span>
+                Rock
+            </button>
+            <button id="paper" class="game-button paper-btn">
+                <span class="symbol">📄</span>
+                Paper
+            </button>
+            <button id="scissors" class="game-button scissors-btn">
+                <span class="symbol">✂️</span>
+                Scissors
+            </button>
+        </div>
+
+        <div id="game-display-area" class="text-3xl font-extrabold mt-8 p-6 rounded-xl shadow-inner text-center">
+            Let's Play!
+        </div>
+    </div>
+
+    <script>
+        // Note: Emoji display can vary across different operating systems and browsers.
+        // If you see '' symbols, it means your system's font might not support these specific emojis.
+        // For universal compatibility, consider replacing emojis with SVG icons or images.
+
+        // Get references to DOM elements
+        const rockBtn = document.getElementById('rock');
+        const paperBtn = document.getElementById('paper');
+        const scissorsBtn = document.getElementById('scissors');
+        const gameDisplayArea = document.getElementById('game-display-area');
+
+        // Mapping choices to their emojis for display (corrected the rock emoji)
+        const emojiMap = {
+            'rock': '🪨', /* Corrected from '' to '🪨' */
+            'paper': '📄',
+            'scissors': '✂️'
+        };
+
+        // Function to make a play request to the Flask backend
+        async function makePlay(choice) {
+            // Clear previous results and reset display area
+            gameDisplayArea.innerHTML = '';
+            gameDisplayArea.classList.remove('win', 'lose', 'draw');
+            gameDisplayArea.textContent = 'Thinking...'; // Indicate loading state
+
+            try {
+                // Send the player's choice to the /play endpoint
+                const response = await fetch('/play', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ choice: choice })
+                });
+
+                // Check if the response was successful
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Parse the JSON response
+                const data = await response.json();
+
+                // Start the animation sequence
+                animateGameResult(data.player_choice, data.computer_choice, data.outcome);
+
+            } catch (error) {
+                console.error('Error during play:', error);
+                gameDisplayArea.textContent = 'Error playing game. Please try again.';
+                gameDisplayArea.classList.add('lose'); // Indicate error visually
+            }
+        }
+
+        // Function to handle the animation and display results
+        function animateGameResult(playerChoice, computerChoice, outcome) {
+            gameDisplayArea.innerHTML = ''; // Clear existing content
+
+            // Create player and computer symbol elements
+            const playerSymbolEl = document.createElement('span');
+            playerSymbolEl.className = 'symbol-display';
+            playerSymbolEl.textContent = emojiMap[playerChoice];
+            // Initial position far left
+            playerSymbolEl.style.left = '10%'; // Player starts at 10% from left
+            gameDisplayArea.appendChild(playerSymbolEl);
+
+            const computerSymbolEl = document.createElement('span');
+            computerSymbolEl.className = 'symbol-display';
+            computerSymbolEl.textContent = emojiMap[computerChoice];
+            // Initial position far right
+            computerSymbolEl.style.left = '90%'; // Computer starts at 90% from left
+            gameDisplayArea.appendChild(computerSymbolEl);
+
+            // Ensure enough space during animation
+            gameDisplayArea.style.minHeight = '250px';
+
+            // Phase 1: Symbols move towards the center to "clash"
+            // This transition is already defined in the .symbol-display class for 'left'
+            setTimeout(() => {
+                playerSymbolEl.style.left = '40%'; // Move player symbol to clash point
+                computerSymbolEl.style.left = '60%'; // Move computer symbol to clash point
+            }, 50); // Small delay to ensure initial positions are rendered before transition starts
+
+            // Phase 2: After symbols have clashed (0.7s transition), apply outcome animations
+            // This timeout fires after the clash movement is complete (50ms initial delay + 700ms transition)
+            setTimeout(() => {
+                // Clear the 'left' transition from symbol-display to prevent conflict with animation keyframes
+                playerSymbolEl.style.transition = '';
+                computerSymbolEl.style.transition = '';
+
+                let loserElement = null;
+                let winnerElement = null;
+                let message = '';
+                let winnerSymbol = '';
+
+                if (outcome === 'win') {
+                    message = `You Win!`;
+                    winnerSymbol = emojiMap[playerChoice];
+                    loserElement = computerSymbolEl;
+                    winnerElement = playerSymbolEl;
+
+                    // Apply loser animation based on the *computer's* choice (the losing item's type)
+                    if (computerChoice === 'scissors') loserElement.classList.add('loser-anim-scissors');
+                    else if (computerChoice === 'rock') loserElement.classList.add('loser-anim-rock');
+                    else if (computerChoice === 'paper') loserElement.classList.add('loser-anim-paper');
+
+                } else if (outcome === 'lose') {
+                    message = `You Lose!`;
+                    winnerSymbol = emojiMap[computerChoice];
+                    loserElement = playerSymbolEl;
+                    winnerElement = computerSymbolEl;
+
+                    // Apply loser animation based on the *player's* choice (the losing item's type)
+                    if (playerChoice === 'scissors') loserElement.classList.add('loser-anim-scissors');
+                    else if (playerChoice === 'rock') loserElement.classList.add('loser-anim-rock');
+                    else if (playerChoice === 'paper') loserElement.classList.add('loser-anim-paper');
+
+                } else { // draw
+                    message = `It's a Draw!`;
+                    winnerSymbol = ''; // No single winner symbol for draw
+                    playerSymbolEl.classList.add('draw-shake-anim');
+                    computerSymbolEl.classList.add('draw-shake-anim');
+                }
+
+                if (winnerElement) {
+                    winnerElement.classList.add('winner-pulse-anim');
+                }
+
+                gameDisplayArea.classList.add(outcome); // Set background color based on outcome
+
+                // Phase 3: Display final result after all animations complete
+                // Total timing: initialRenderDelay (50ms) + clashTransition (700ms) + animDuration (1500ms) + buffer (100ms) = 2350ms
+                setTimeout(() => {
+                    gameDisplayArea.innerHTML = ''; // Clear animated symbols
+                    gameDisplayArea.classList.remove('draw-shake-anim', 'flex-row', 'justify-center', 'items-center', 'gap-4'); // Clean up classes
+                    gameDisplayArea.style.minHeight = 'auto'; // Let content define height now
+
+                    if (outcome === 'draw') {
+                        // For draw, show both symbols side-by-side
+                        const playerDrawSymbol = document.createElement('span');
+                        playerDrawSymbol.className = 'symbol-display winner-symbol-final mx-2';
+                        playerDrawSymbol.textContent = emojiMap[playerChoice];
+
+                        const computerDrawSymbol = document.createElement('span');
+                        computerDrawSymbol.className = 'symbol-display winner-symbol-final mx-2';
+                        computerDrawSymbol.textContent = emojiMap[computerChoice];
+
+                        gameDisplayArea.appendChild(playerDrawSymbol);
+                        gameDisplayArea.appendChild(computerDrawSymbol);
+                        gameDisplayArea.classList.add('flex-row', 'justify-center', 'items-center', 'gap-4');
+                    } else {
+                        const winnerSymbolFinalEl = document.createElement('span');
+                        winnerSymbolFinalEl.className = 'winner-symbol-final';
+                        winnerSymbolFinalEl.textContent = winnerSymbol;
+                        gameDisplayArea.appendChild(winnerSymbolFinalEl);
+                    }
+
+                    const messageEl = document.createElement('p');
+                    messageEl.className = 'text-xl md:text-2xl font-bold mt-4';
+                    messageEl.textContent = message;
+                    gameDisplayArea.appendChild(messageEl);
+
+                }, 50 + 700 + 1500 + 100); // Total timing calculation
+            }, 50 + 700); // Trigger outcome animations after initial clash transition
+        }
+
+        // Add event listeners to the choice buttons
+        rockBtn.addEventListener('click', () => makePlay('rock'));
+        paperBtn.addEventListener('click', () => makePlay('paper'));
+        scissorsBtn.addEventListener('click', () => makePlay('scissors'));
+    </script>
+</body>
+</html>
+�
